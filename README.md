@@ -1,2 +1,2 @@
 # The-Goon
-A simple discord bot i made. Just the code for it
+A discord bot i made that does games, gambling and random stuff. Just the code for it
