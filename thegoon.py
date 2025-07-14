@@ -4,6 +4,7 @@ import random
 import discord
 import requests
 from discord.ext import commands
+from bs4 import BeautifulSoup
 
 # setup
 intents = discord.Intents.default()
@@ -12,6 +13,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="/", intents=intents)
 permissions_integer = 586005375540800
+version = "v1.0.0"
 
 
 # === utilities ===
@@ -42,6 +44,23 @@ async def list_members(guild: discord.Guild):
 
 
 # === events ===
+@bot.event
+async def on_ready():
+    print(f"Bot is online as {bot.user}")
+
+
+@bot.event
+async def on_member_join(member):
+    # Replace with your actual channel name or ID
+    channel = discord.utils.get(member.guild.text_channels, name='general')
+
+    if channel:
+        await channel.send(f"👋 Hello im, {member.mention}! {version}")
+        await channel.send(
+            "https://tenor.com/view/it's-been-awhile-its-been-a-while-omni-man-omni-man-meme-invincible-gif-17023911097105463424"
+        )
+    else:
+        print("Channel not found.")
 
 
 # === commands ===
@@ -115,13 +134,14 @@ async def phasmo_item(ctx):
     ]
     await ctx.send(f"Item Selected: {random.choice(items)}")
 
+
 @bot.command()
 async def phasmo_ghosts(ctx):
     ghosts = [
         "Spirit", "Wraith", "Phantom", "Poltergeist", "Banshee", "Jinn",
-        "Mare", "Revenant", "Shade", "Demon", "Yurei", "Oni", "Yokai",
-        "Hantu", "Goryo", "Myling", "Onryo", "The Twins", "Raiju", "Obake",
-        "The Mimic", "Moroi", "Deogen", "Thaye"
+        "Mare", "Revenant", "Shade", "Demon", "Yurei", "Oni", "Yokai", "Hantu",
+        "Goryo", "Myling", "Onryo", "The Twins", "Raiju", "Obake", "The Mimic",
+        "Moroi", "Deogen", "Thaye"
     ]
     await ctx.send(f"Ghost Selected: {random.choice(ghosts)}")
 
@@ -178,10 +198,12 @@ async def random_list(ctx, *args):
 @bot.command()
 async def iris(ctx):
     await ctx.send(random.choice(iris_songs))
-    
+
+
 @bot.command()
 async def dragonforce(ctx):
     await ctx.send("https://www.youtube.com/watch?v=0jgrCKhxE1s")
+
 
 @bot.command()
 async def join(ctx):
@@ -207,17 +229,89 @@ async def roulette(ctx, color: str, num: str, money=100):
     await ctx.send("The ball landed on {} {}".format(winning_color, number))
     if color == winning_color and num == 'NONE' and winning_color != 'green':
         money *= 2
-        await ctx.send("You won with a payout of 2:1. Your money is now {}".format(money))
-    elif color == 'NONE' and num == str(number) or winning_color == color and winning_color == 'green':
+        await ctx.send(
+            "You won with a payout of 2:1. Your money is now {}".format(money))
+    elif color == 'NONE' and num == str(
+            number) or winning_color == color and winning_color == 'green':
         money *= 36
-        await ctx.send("You won with a payout of 35:1. Your money is now {}".format(money))
+        await ctx.send(
+            "You won with a payout of 35:1. Your money is now {}".format(money)
+        )
     await ctx.send("Play Again? Y/N")
-    response = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+    response = await bot.wait_for(
+        'message', check=lambda message: message.author == ctx.author)
     if response.content.lower() == 'y':
         await roulette(ctx, color, num, money)
     else:
         await ctx.send("Ended with a total of {}".format(money))
         return 0
+
+
+@bot.command()
+async def get_top_sales(ctx, limit=15):
+    """Get the top games on sale from Steam"""
+    url = "https://store.steampowered.com/search/?specials=1"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    results = soup.select(".search_result_row")
+    print(f"Top {limit} games on sale:\n")
+
+    for result in results[:limit]:
+        title = result.select_one(".title").text.strip()
+        discount = result.select_one(".search_discount span")
+        price = result.select_one(".search_price_discount_combined")
+        link = result["href"]
+
+        discount_text = discount.text.strip() if discount else "No discount"
+        price_text = price.text.strip().replace("\n", " ") if price else "N/A"
+
+        await ctx.send(
+            f"{title}  Discount: {discount_text}  Price: {price_text}\n  Link: {link}\n"
+        )
+
+
+@bot.command()
+async def truth_or_dare(ctx):
+    truths = [
+        "What’s the weirdest thing you’ve ever eaten?",
+        "What's your least favorite anime",
+        "What’s your favorite song?",
+        "Have you ever lied to get out of trouble?",
+        "What’s something you’ve never told anyone?"
+        "What’s the most embarrassing thing that has happened to you?",
+        "If you were stranded on an island whats the first thing you'd do?",
+        "What is the bordest you've ever been?",
+        "What is your opinion on the current president?",
+        "What is the dumbest / most cringy thing you've ever said?",
+        "If you could only eat one food for the rest of your life what would it be?",
+        "Do you prefer hot or cold showers?",
+        "What is the worst movie you have ever seen?",
+    ]
+    dares = [
+        "Tell a joke. NOW!",
+        "Sing the intro to through the fire and flames",
+        "Lick peanut butter off your elbow",
+        "DM a random person and talk in brainrot",
+        "Play clone hero at 200% speed blindfolded",
+        "Play minecraft with your feet for 10 minutes",
+        "take a drink every time carney jared says something crazy on his latest stream",
+        "Do pushups and say david every time you do one",
+        "take a shot of a carbonated drink",
+        "sing the national anthem",
+        "sing the alphabet backwards",
+        "do your best omni man impression"
+        "pick a random person and say their name in a french accent",
+    ]
+    await ctx.send("Truth or Dare?")
+    response = await bot.wait_for(
+        'message', check=lambda message: message.author == ctx.author)
+    if response.content.lower() == 'truth':
+        await ctx.send(random.choice(truths))
+        return
+    elif response.content.lower() == 'dare':
+        await ctx.send(random.choice(dares))
+        return
 
 
 # === Start Bot ===
