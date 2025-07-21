@@ -1,21 +1,68 @@
+
+import asyncio
+import json
 import os
 import random
 
+import aiohttp
 import discord
 import requests
-import yt_dlp
 from bs4 import BeautifulSoup
+from discord import app_commands
 from discord.ext import commands
+
+### A DISCORD BOT MADE BY INEXPLICABLE768 ###
+### THE GOON. WHO IS THE GOON? THE GOON IS ME ###
+### ENJOY THE CODE IG ###
 
 # setup
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.voice_states = True
 bot = commands.Bot(command_prefix="/", intents=intents)
+client = discord.Client(intents=intents)
+DATA_FOLDER = "./data"
+
+user_agent = {
+    "User-Agent": "https://replit.com/@mathematicaency/TheGoon#main.py, v1.0)"
+}
+custom_emojis = ["<:ocelot:1394152101864669235>", "<:lazermax:1394151691749949632>", "<:orangeman:1394151590553980998>",
+                "<a:fdiscordmods:1394151257375113458>", "<:killme:1394151095122792448>", "<:missing:1394150968706469938>",
+                "<:vincentvangofyourself:1394150760027127900>", "<:cornluke:1394150657577189479>", "<:max:1394150597514498128>",
+                "<:letmegoon:1394150527528337419>", "<:garlicquentin:1394150107145965729>", "<:andrewvodka:1394150028163027076>",
+                "<:thatspea:1394149976439001200>", "<:meltingdrew:1394149942301294765>", "<:idontmindthesmell:1394149520710832218>",
+                "<:hammers:1394149453107040338>", "<:getajob:1394022666314322012>", "<:diddytesla:1394022591177429012>",
+                "<:thegoon:1394022544218001459>"]
+def read_points(server_id: str):
+    filename = f"{server_id}_points.json"
+    try:
+        with open(filename, "r") as f:
+            data = f.read().strip()
+            return json.loads(data) if data else {}
+    except (json.JSONDecodeError, FileNotFoundError):
+        print(f"[{server_id}] Points file missing or corrupted. Will create new one.")
+        return {}
+
+def write_points(server_id, points):
+    filename = os.path.join(f"{server_id}_points.json")
+    try:
+        with open(filename, 'w') as f:
+            json.dump(points, f, indent=2)
+    except Exception as e:
+        print(f"Error writing {filename}: {e}")
+        return False
+        
+# this should help the bot stay in the call
+class Silence(discord.PCMVolumeTransformer):
+    def __init__(self):
+        super().__init__(discord.FFmpegPCMAudio("pipe:0", pipe=True, stderr=None, before_options="-f lavfi -i anullsrc=r=48000:cl=stereo"))
+    def read(self):
+        return b'\x00' * 3840  # 20ms of stereo silence at 48kHz (2 channels * 2 bytes * 960 samples)
 
 # constants
 permissions_integer = 586005375540800
-version = "v1.2.0"
+version = "v1.3.2"
 # brainrot hangman
 WORDS = ["bigger", 'hawk tuah', 'skibidi', 'fuck you', 'david marshall', 'omniman', 
          'kill your self', 'troth senchal', 'coomer', 'kambabala', 'make america gay again',
@@ -48,7 +95,31 @@ bird_images = [
     "https://plus.unsplash.com/premium_photo-1674381523736-e6fdc5c1e708?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTExfHxmdW5ueSUyMGJpcmR8ZW58MHx8MHx8fDA%3D",
     "https://images.unsplash.com/photo-1699735129478-f89275a3e601?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTIxfHxmdW5ueSUyMGJpcmR8ZW58MHx8MHx8fDA%3D",
     "https://vistapointe.net/images/vladimir-putin-4.jpg"
-    
+
+]
+
+verses = [
+    "John 3:16", "Genesis 1:1", "Psalm 23:1", "Romans 8:28", "Philippians 4:13",
+    "Proverbs 3:5", "Isaiah 41:10", "Matthew 6:33", "Jeremiah 29:11", "1 Corinthians 13:4",
+    "Romans 12:2", "Joshua 1:9", "Hebrews 11:1", "1 John 4:8", "Psalm 46:10",
+    "2 Timothy 1:7", "James 1:5", "Matthew 11:28", "Ephesians 2:8", "Galatians 5:22",
+    "Isaiah 40:31", "Matthew 5:16", "Colossians 3:23", "Psalm 119:105", "1 Thessalonians 5:16",
+    "Romans 5:8", "John 14:6", "Proverbs 18:10", "Romans 10:9", "1 Peter 5:7",
+    "2 Chronicles 7:14", "Psalm 37:4", "John 8:12", "Romans 6:23", "Luke 6:31",
+    "Philippians 4:6", "Proverbs 16:3", "Matthew 28:19", "1 Corinthians 10:13", "Psalm 34:18",
+    "Isaiah 26:3", "Galatians 2:20", "1 John 1:9", "Exodus 14:14", "Psalm 121:1",
+    "2 Corinthians 5:17", "Hebrews 13:5", "Acts 1:8", "Ephesians 6:11", "James 1:2",
+    "Micah 6:8", "Matthew 22:37", "Lamentations 3:22", "Romans 15:13", "Isaiah 43:2",
+    "1 Corinthians 15:58", "Philippians 2:3", "Ephesians 4:29", "Psalm 19:14", "Deuteronomy 31:6",
+    "Colossians 3:2", "2 Corinthians 12:9", "Hebrews 4:12", "Matthew 7:7", "Romans 8:38",
+    "Psalm 91:1", "Ecclesiastes 3:1", "1 Corinthians 6:19", "Proverbs 4:23", "Galatians 6:9",
+    "Titus 2:11", "Nahum 1:7", "Zephaniah 3:17", "Mark 12:30", "Psalm 139:14",
+    "Luke 1:37", "Matthew 5:14", "1 John 5:14", "James 4:7", "Proverbs 27:17",
+    "Psalm 27:1", "Isaiah 53:5", "Ephesians 3:20", "Hebrews 10:24", "Colossians 2:6",
+    "2 Peter 3:9", "1 Timothy 6:12", "Job 19:25", "Psalm 30:5", "Luke 11:9",
+    "Romans 3:23", "John 10:10", "Isaiah 55:8", "Matthew 18:20", "Revelation 21:4",
+    "Acts 2:38", "John 15:5", "Psalm 90:12", "Ephesians 5:2", "1 John 2:17",
+    "2 Timothy 3:16", "Psalm 100:4", "Matthew 6:9", "Hebrews 12:1", "Jeremiah 17:7"
 ]
 
 iris_songs = [
@@ -67,7 +138,9 @@ iris_songs = [
     "https://www.youtube.com/watch?v=CwrsUzyqflU",
     "https://www.youtube.com/watch?v=c9cvcQGXMdw",
 ]
-
+hawk_tuah_asmr = [
+    ""
+]
 YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': 'True',
@@ -100,39 +173,55 @@ def get_coordinates_from_zip(zip_code: int, country="US"):
 
 def far(celcius: float):
     return celcius * 1.8 + 32
-
+def random_time():
+    hour = random.randint(0, 23)
+    minute = random.randint(0, 59)
+    return f"{hour:02}:{minute:02}"
+def clear_slop():
+    pass
 
 async def list_members(guild: discord.Guild):
     return [member async for member in guild.fetch_members(limit=50)]
 
 
 # === events ===
+
+@client.event
+async def on_message(message):
+    if message.author.bot:
+        return
+    print(message.content)
+    if "fuck" in message.content:
+        await message.channel.send("Oopsie poopsie you said a no no word.")
+        
+# loading event code
 @bot.event
 async def on_ready():
     for guild in bot.guilds:
         print(f"Connected to guild: {guild.name} (ID: {guild.id})")
-    
+
     try:
         synced = await bot.tree.sync()
         print(f"Synced {len(synced)} commands globally")
-        
+
         for guild in bot.guilds:
             guild_obj = discord.Object(id=guild.id)
             synced_guild = await bot.tree.sync(guild=guild_obj)
             print(f"Synced {len(synced_guild)} commands to {guild.name}")
-            
+
     except Exception as e:
         print(f"Failed to sync commands: {e}")
-    
+
     print(f"Bot is online as {bot.user}")
 
+# when a member joins
 @bot.event
 async def on_member_join(member):
     channels = ['main', 'general', 'welcome', 'home', 'hello']
     for n in channels:
         channel = discord.utils.get(member.guild.text_channels, name=n)
         if channel:
-            await channel.send(f"Hello im, {member.mention} {version}")
+            await channel.send(f"Hello, {member.mention} welcome.")
             await channel.send(
                 "https://tenor.com/view/it's-been-awhile-its-been-a-while-omni-man-omni-man-meme-invincible-gif-17023911097105463424"
             )
@@ -141,13 +230,31 @@ async def on_member_join(member):
             print("Channel not found :(")
 
 
+
+
 # === commands ===
+
+
+@bot.tree.command(name="gpurge", description="remove the last n messages in the channel. Admin use only. Can take max 1000")
+@app_commands.checks.has_permissions(administrator=True)
+async def gpurge(interaction: discord.Interaction, amount: int):
+    if not isinstance(interaction.channel, discord.TextChannel):
+        await interaction.response.send_message("This command can only be used in a text channel.")
+        return
+    if amount > 1000:
+        await interaction.response.send_message("You can only delete up to 1000 messages at a time.")
+        return
+    await interaction.response.defer()
+    deleted = await interaction.channel.purge(limit=amount)
 
 
 @bot.tree.command(name="about", description="A totally normal about message")
 async def about(interaction: discord.Interaction):
     await interaction.response.send_message(random.choice(about_i))
 
+@bot.tree.command(name="debug", description="Intended for admins. A way to see if the bot is working and see info about the server")
+async def debug(interaction: discord.Interaction):
+    await interaction.response.send_message(f"Bot User Id {bot.user} \n Connected to guild: {interaction.guild.name}\n (ID: {interaction.guild.id}) \nBot version: {version} \nBot latency: {round(bot.latency * 1000)} ms \n Bot permissions: {permissions_integer}")
 
 @bot.tree.command(name="ping_me", description="Ping the bot to see latency")
 async def ping_me(interaction: discord.Interaction):
@@ -158,7 +265,7 @@ async def ping_me(interaction: discord.Interaction):
 @bot.tree.command(name="roll_die", description="Roll an n sided die")
 async def roll_die(interaction: discord.Interaction, sides: int):
     choice = random.randint(1, sides)
-    await interaction.response.send_message(f"You rolled a: {choice}")
+    await interaction.response.send_message(f":game_die: You rolled a: {choice}")
 
 
 @bot.tree.command(name="flip_coin",
@@ -181,8 +288,8 @@ async def random_user(interaction: discord.Interaction):
     await interaction.response.send_message(f"Selected: {selected.display_name}")
 
 
-@bot.tree.command(name="marry_boff_kill",
-                  description="A totally family friendly game.")
+@bot.tree.command(name="marry_kiss_kill",
+                  description="A totally family friendly game. Choose 1 to marry, 1 to kiss, 1 to kill. YOU HAVE TO.")
 async def marry_boff_kill(interaction: discord.Interaction):
     if not interaction.guild:
         await interaction.response.send_message("This command can only be used in a server.")
@@ -191,6 +298,9 @@ async def marry_boff_kill(interaction: discord.Interaction):
     selected = random.sample(members, 3)
     await interaction.response.send_message(f"MBK: {', '.join(m.display_name for m in selected)}")
 
+@bot.tree.command(name="drinking_game", description="Take a drink every time what the goon says happens")
+async def drinking_game(interaction: discord.Interaction):
+    await interaction.response.send_message("DONT DRINK KIDS")
 
 @bot.tree.command(
     name="phasmo_item",
@@ -216,6 +326,38 @@ async def phasmo_ghosts(interaction: discord.Interaction):
     ]
     await interaction.response.send_message(f"Ghost Selected: {random.choice(ghosts)}")
 
+@bot.tree.command(name="custom_emoji_list", description="List of custom emojis by the goon")
+async def custom_emoji_list(interaction: discord.Interaction):
+    await interaction.response.send_message(custom_emojis)
+
+@bot.tree.command(name="custom_emoji_react", description="React to the previous message with a custom emoji")
+async def custom_emoji_react(interaction: discord.Interaction, emoji: str):
+    index = [i for i, s in enumerate(custom_emojis) if emoji in s]
+    if not len(index):
+        await interaction.response.send_message("Invalid emoji")
+        return
+    messages = [msg async for msg in interaction.channel.history(limit=5)]
+    for msg in messages:
+        try:
+            await msg.add_reaction(custom_emojis[index[0]])
+            return
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"Failed to react: {str(e)}", ephemeral=True)
+            return
+    
+@bot.tree.command(name="custom_emoji", description="Send a custom emoji via the goon")
+async def custom_emoji(interaction: discord.Interaction, emoji: str):
+    index = [i for i, s in enumerate(custom_emojis) if emoji in s]
+    if not len(index):
+        await interaction.response.send_message("Invalid emoji")
+        return
+    messages = await interaction.channel.history(limit=2).flatten()
+    if len(messages) < 2:
+        print("Error no messages")
+    else:
+        previous_message = messages[1]  
+        await previous_message.send_message(custom_emojis[index[0]])
+    
 
 @bot.tree.command(name="bird_picture",
                   description="Why youd need this im not sure but here it is")
@@ -288,25 +430,8 @@ async def asmr(interaction: discord.Interaction):
 
 @bot.tree.command(name="dragonforce", description="epic")
 async def dragonforce(interaction: discord.Interaction):
-    await interaction.response.send_message("https://www.youtube.com/watch?v=0jgrCKhxE1s")
+    await interaction.response.send_message("https://www.youtube.com/watch?v=cqH1kMG5P0Q")
 
-
-@bot.tree.command(name="join", description="add the bot to your voice channel")
-async def join(interaction: discord.Interaction):
-    """Joins your voice channel"""
-    if not interaction.guild:
-        await interaction.response.send_message("This command can only be used in a server.")
-        return
-
-    member = interaction.guild.get_member(interaction.user.id)
-    if member and member.voice and member.voice.channel:
-        try:
-            await member.voice.channel.connect()
-            await interaction.response.send_message("Joined your voice channel!")
-        except Exception as e:
-            await interaction.response.send_message(f"Failed to join voice channel: {str(e)}")
-    else:
-        await interaction.response.send_message("You need to be in a voice channel first.")
 
 
 @bot.tree.command(name="roulette", description="Test your luck at roulette")
@@ -320,9 +445,9 @@ async def roulette(interaction: discord.Interaction, color: str, num: str, money
         winning_color = 'black'
     else:
         winning_color = 'red'
-    
+
     await interaction.response.send_message("The ball landed on {} {}".format(winning_color, number))
-    
+
     # Check for wins
     if color == winning_color and num == 'NONE' and winning_color != 'green':
         money *= 2
@@ -334,7 +459,7 @@ async def roulette(interaction: discord.Interaction, color: str, num: str, money
             "You won with a payout of 35:1. Your money is now {}".format(money))
     else:
         await interaction.followup.send("You lost! Your money is now {}".format(money))
-    
+
     await interaction.followup.send("Thanks for playing! Use the command again to play another round.")
 
 
@@ -342,7 +467,40 @@ async def roulette(interaction: discord.Interaction, color: str, num: str, money
 async def blackjack(interaction: discord.Interaction, money: int = 100):
     """Play Blackjack"""
     deck = [n + ' of ' + s for n in numbers for s in suits]
-    
+    random.shuffle(deck)
+    player_hand = [deck.pop(), deck.pop()]
+    dealer_hand = [deck.pop(), deck.pop()]
+    await interaction.response.send_message("Card: {}".format(player_hand[0]))
+    await interaction.followup.send("hit or stand?")
+    while True:
+        response = await bot.wait_for(
+            'message', check=lambda message: message.author == interaction.user)
+        if response.content.lower() == 'hit':
+            player_hand.append(deck.pop())
+            await interaction.followup.send("Card: {}".format(player_hand[-1]))
+            if sum([int(card.split()[0]) for card in player_hand]) > 21:
+                await interaction.followup.send("Bust! You lose.")
+                break
+        elif response.content.lower() == 'stand':
+            while sum([int(card.split()[0]) for card in dealer_hand]) < 17:
+                dealer_hand.append(deck.pop())
+            await interaction.followup.send("Dealer's hand: {}".format(dealer_hand))
+            if sum([int(card.split()[0]) for card in dealer_hand]) > 21:
+                await interaction.followup.send("Dealer busts! You win.")
+                money *= 2
+                await interaction.followup.send("Your money is now {}".format(money))
+            elif sum([int(card.split()[0]) for card in player_hand]) > sum(
+                    [int(card.split()[0]) for card in dealer_hand]):
+                await interaction.followup.send("You win!")
+                money *= 2
+                await interaction.followup.send("Your money is now {}".format(money))
+            else:
+                await interaction.followup.send("You lose.")
+            break
+        else:
+            await interaction.followup.send("Please enter 'hit' or 'stand' or 'quit'.")
+
+
 @bot.tree.command(name="get_top_sales",
                   description="Check out the top games on sale on steam")
 async def get_top_sales(interaction: discord.Interaction, limit: int = 5):
@@ -417,15 +575,6 @@ async def truth_or_dare(interaction: discord.Interaction):
         return
 
 
-@bot.tree.command(name="leave",
-                  description="Remove the bot from your voice channel")
-async def leave(interaction: discord.Interaction):
-    """Leaves your voice channel"""
-    if interaction.guild and interaction.guild.voice_client:
-        await interaction.guild.voice_client.disconnect(force=True)
-        await interaction.response.send_message("Left the voice channel.")
-    else:
-        await interaction.response.send_message("Not currently in a voice channel.")
 
 
 @bot.tree.command(name="tic_tac_toe_h",
@@ -478,6 +627,7 @@ async def hangman(interaction: discord.Interaction):
     if interaction.channel.id in games:
         await interaction.followup.send("A game is already running in this channel!")
         return
+    await interaction.response.send_message("Starting hangman. Use /guess <letter> to guess a letter.")
     word = random.choice(WORDS)
     display = ["_"] * len(word)
     guesses = []
@@ -494,7 +644,7 @@ async def hangman(interaction: discord.Interaction):
         f"Hangman started. Word: `{' '.join(display)}`\n"
         f"Guess a letter using `!guess <letter>`"
     )
-@bot.tree.command(name="guess", description="guess a letter in hangman")
+@bot.command()
 async def guess(ctx, letter: str):
     game = games.get(ctx.channel.id)
     if not game:
@@ -537,10 +687,81 @@ async def elon_musk_twitter(interaction: discord.Interaction):
 async def goon(interaction: discord.Interaction):
     await interaction.response.send_message("FREAK AHH WHY WOULD YOU ENTER THIS COMMAND")
     await interaction.followup.send("https://tenor.com/view/benjammins-gooner-goon-what-a-gooner-simp-gif-6065693207482219935")  
+    
+# === GeoGuess ===
+# rarley do i comment code but this is hard to read
+def get_random_coordinate():
+    lat = round(random.uniform(-60, 85), 6)
+    lon = round(random.uniform(-180, 180), 6)
+    return lat, lon
 
-@bot.tree.command(name="geoguessr", description="Play geoguessr with an image randomly selected from the internet")
-async def geoguessr(interaction: discord.Interaction):
-    await interaction.response.send_message("Not implemented yet I was too busy eating cheetos")
+def is_land(lat, lon):
+    url = "https://nominatim.openstreetmap.org/reverse"
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "format": "json",
+        "zoom": 10,
+        "addressdetails": 1
+    }
+    headers = {
+        "User-Agent": "GeoBotDiscord/1.0 (foo@example.com)"
+    }
+
+    try:
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("address"), data.get("display_name")
+        else:
+            print("Error:", response.status_code)
+            return None, None
+    except Exception as e:
+        print("Error:", e)
+        return None, None
+        
+def get_osm_map_url(lat, lon, zoom=15, size="800x600"):
+    return f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lon}&zoom={zoom}&size={size}"
+
+
+@bot.tree.command(name="geoguesser", description="Guess the location from an image")
+async def geoguesser(interaction: discord.Interaction):
+    await interaction.response.send_message("Looking for a random location on land. This may take a moment because the api makes me wait.")
+
+    lat, lon = None, None
+    address, display_name = None, None
+
+    # Loop until a land location is found. sleep bc api sucks
+    while True:
+        lat, lon = get_random_coordinate()
+        address, display_name = is_land(lat, lon)
+        if address: # break when we find a valid location
+            break
+        await asyncio.sleep(1)  # Rate limit for Nominatim API
+
+    map_url = get_osm_map_url(lat, lon)
+
+    embed = discord.Embed(title="🌍 Guess the location", description="Reply with your guess here in chat within 60 seconds.")
+    embed.set_image(url=map_url)
+    await interaction.followup.send(embed=embed)
+
+    def check(m):
+        return m.channel == interaction.channel and m.author == interaction.user
+
+    try:
+        # check if the user's guess is correct
+        guess_msg = await bot.wait_for('message', timeout=60.0, check=check)
+        country = address.get("country", "").lower()
+        state = address.get("state", "").lower()
+
+        guess_content = guess_msg.content.lower()
+        if country in guess_content or state in guess_content:
+            await interaction.followup.send(f"✅ Correct... wow you are a real nerd The location was: **{display_name}**")
+        else:
+            await interaction.followup.send(f"❌ Wrong mate. The correct answer was: **{display_name}**")
+    except asyncio.TimeoutError:
+        await interaction.followup.send(f"⏱️ Too slow. The correct answer was: **{display_name}**")
+
 
 @bot.tree.command(name="meme", description="Get a random meme from reddit, May or may not be cringe or nsfw")
 async def meme(interaction: discord.Interaction):
@@ -548,63 +769,148 @@ async def meme(interaction: discord.Interaction):
     response = requests.get(url)
     data = response.json()
     await interaction.response.send_message(data["url"])
-    await interaction.followup.send(data["title"])
-    await interaction.followup.send(data["postLink"])
-    await interaction.followup.send(data["author"])
+    await interaction.followup.send(data["title"] + "" + (data["author"]))
 
-@bot.tree.command(name="bible", description="Get a random verse from the Bible.")
+
+@bot.tree.command(name="bible", description="Let the goon preach to you. Get a random Bible verse.")
 async def bible(interaction: discord.Interaction):
-    url = "https://labs.bible.org/api/?passage=random&type=json"
-    response = requests.get(url)
+    chance = random.randint(1, 100)
+    if chance == 1:
+        await interaction.response.send_message("Christianity is just a beleif system gooners. there is no evidence for or against it. We dont know if it is true or not or what lies outside of our universe and our lives. We can have faith in a god but we can also have faith in a toaster. Its all up to the human mind that you posess to decide what you beleive in and what happens when we die.")
+        return
+    chance2 = random.randint(1, 200)
+    if chance2 == 1:
+        await interaction.response.send_message("Goon 10:23 ling gan guli guli ling wa")
+    verse = random.choice(verses)
+    url = f"https://bible-api.com/{verse.replace(' ', '%20')}"
 
-    if response.status_code == 200:
-        data = response.json()
-        verse = data[0] 
-        message = f"**{verse['bookname']} {verse['chapter']}:{verse['verse']}**\n"
-        message += f"{verse['text']}\n"
-        message += f"(*{verse.get('translation_name', 'Translation Unknown')}*)"
+    await interaction.response.defer()
 
-        await interaction.response.send_message(message)
-    else:
-        await interaction.response.send_message("Failed to fetch verse. Please try again later.")
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                message = f"**{data['reference']}**\n{data['text']}"
+                await interaction.followup.send(message.replace("Yahweh","God"))
+            else:
+                await interaction.followup.send("Failed to fetch the verse. Try again later.")
+
 
 @bot.tree.command(name="flag", description="Get a random flag from the world")
 async def flag(interaction: discord.Interaction):
-    url = "https://restcountries.com/v3.1/all"
+    url = "https://restcountries.com/v3.1/all?fields=name,capital,region,flags"
     response = requests.get(url)
     data = response.json()
+    print(data)
     country = random.choice(data)
-    await interaction.response.send_message(country["flags"]["png"])
-    await interaction.followup.send(country["name"]["common"])
-    await interaction.followup.send(country["capital"][0])
+    try:
+        await interaction.response.send_message(country["flags"]["png"])
+        await interaction.followup.send(country["name"]["common"])
+        await interaction.followup.send(country["capital"][0])
+    except Exception as e:
+        print(e)
 
 
-@bot.tree.command(name="playaudio", description="takes a youtube url and plays the audio in the voice channel")
-async def playaudio(ctx, url: str):
-    if not ctx.voice_client:
-        await ctx.invoke(bot.get_command('join'))
+@bot.tree.command(name="join", description="Bot joins your current voice channel.")
+async def join(interaction: discord.Interaction):
+    if interaction.guild is None:
+        await interaction.response.send_message("This command can only be used in a server.")
+        return
+    member = interaction.guild.get_member(interaction.user.id)
+    if not member or not member.voice:
+        await interaction.response.send_message("You are not in a voice channel!", ephemeral=True)
+        return
 
-    with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-        info = ydl.extract_info(url, download=False)
-        if info is None:
-            await ctx.send("Failed to retrieve audio URL.")
-            return
-        audio_url = info['url']
+    channel = member.voice.channel
+    await channel.connect()
+    await interaction.response.send_message(f"Connected to {channel.name}")
 
-    ctx.voice_client.stop()
-    source = await discord.FFmpegOpusAudio.from_probe(audio_url)
-    ctx.voice_client.play(source, after=lambda e: print(f'Player error: {e}') if e else None)
-    await ctx.send(f"Now playing: {info['title']}")
-    
-@bot.tree.command(name="clear", description="deletes the last n messages in the channel sent by the goon")
-async def clear(interaction: discord.Interaction, amount: int):
+
+@bot.tree.command(name="degoon", description="deletes the last n messages in the channel sent by the goon")
+async def degoon(interaction: discord.Interaction, amount: int):
     if not isinstance(interaction.channel, discord.TextChannel):
         await interaction.response.send_message("This command can only be used in a text channel.")
         return
-    
+
     await interaction.response.defer()
     deleted = await interaction.channel.purge(limit=amount, check=lambda m: m.author == bot.user)
     await interaction.followup.send(f"Deleted {len(deleted)} messages.")
+
+
+@bot.tree.command(name="trivia", description="Play a trivia game with a random question")
+async def trivia(interaction: discord.Interaction):
+    url = "https://opentdb.com/api.php?amount=1&type=multiple"
+    response = requests.get(url)
+    data = response.json()
+
+
+@bot.tree.command(name="answer", description="Answer a trivia question")
+async def answer(interaction: discord.Interaction, answer: str):
+    if not interaction.channel:
+        return
+
+@bot.tree.command(name="shrimp", description="Is that shit real man")
+async def shrimp(interaction: discord.Interaction):
+    await interaction.response.send_message("https://img.ifunny.co/images/9c52b138d1ebf767b59aba505dd66e1d0790a5146b306e63ca4e0a5b5f85cb84_1.jpg")
+
+@bot.tree.command(name="wallet", description="See how many goon points you have")
+async def wallet(interaction: discord.Interaction):
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.")
+        return
+
+    server_id = str(interaction.guild.id)
+    user_id = str(interaction.user.id)
+
+    points = read_points(server_id)
+
+    # If user not in points, initialize them
+    if user_id not in points:
+        points[user_id] = 0
+        write_points(server_id, points)
+        await interaction.response.send_message("You have 0 goon points. Some day these will replace the dollar trust me")
+        return
+
+    user_points = points[user_id]
+    await interaction.response.send_message(f"You have {user_points} goon points.")
+
+@bot.tree.command(name="give", description="Give goon points to someone. Admins only")
+@app_commands.checks.has_permissions(administrator=True)
+async def give(interaction: discord.Interaction, user: discord.Member, amount: int):
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.")
+        return
+    write_points(str(interaction.guild.id), {str(user.id), amount})
+    await interaction.response.send_message("Gave goon points to user")
+    
+@bot.tree.command(name="suprise", description="Ba da ba ba ba david")
+async def suprise(interaction: discord.Interaction):
+    await interaction.response.send_message("https://www.youtube.com/watch?v=TtdR-qo910k")
+
+@bot.tree.command(name="omni", description="We can be bees!")
+async def omni(interaction: discord.Interaction):
+    await interaction.response.send_message("https://tenor.com/view/omni-gyatt-gif-17689339150837030890")
+
+@bot.tree.command(name="cat", description="random cat gif from tenor")
+async def cat(interaction: discord.Interaction):
+    cats = ["https://tenor.com/view/cat-gif-16258174987336597266", "https://tenor.com/view/cat-cat-with-tongue-cat-smiling-gif-11949735780193730026", "https://tenor.com/view/silly-reaction-meme-stan-twitter-funny-stressed-gif-7713976294327515532"]
+    await interaction.response.send_message(random.choice(cats))
+
+@bot.tree.command(name="info", description="Actual info trust me bro")
+async def info(interaction: discord.Interaction):
+    await interaction.response.send_message(f"=== THE GOON ===\n\n a discord bot made by Inexplicable768 (alex). \n version: {version}\nI didnt know i had to put that there")
+
+# === Errors ===
+
+@give.error
+async def give_error(interaction: discord.Interaction, error):
+    if isinstance(error, app_commands.errors.MissingPermissions):
+        await interaction.response.send_message("You must be an administrator to use this command.", ephemeral=True)
+@gpurge.error
+async def give_error(interaction: discord.Interaction, error):
+    if isinstance(error, app_commands.errors.MissingPermissions):
+        await interaction.response.send_message("You must be an administrator to use this command.", ephemeral=True)
+        
 # === Start Bot ===
 if __name__ == "__main__":
     try:
