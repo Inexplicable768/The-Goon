@@ -49,6 +49,7 @@ def write_points(server_id, points):
     try:
         with open(filename, 'w') as f:
             json.dump(points, f, indent=2)
+            return True
     except Exception as e:
         print(f"Error writing {filename}: {e}")
         return False
@@ -625,7 +626,7 @@ async def hangman(interaction: discord.Interaction):
     if not interaction.channel:
         return
     if interaction.channel.id in games:
-        await interaction.followup.send("A game is already running in this channel!")
+        await interaction.followup.send("A game is already running in this channel moron.")
         return
     await interaction.response.send_message("Starting hangman. Use /guess <letter> to guess a letter.")
     word = random.choice(WORDS)
